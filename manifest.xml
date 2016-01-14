@@ -1,0 +1,14 @@
+<package>
+  <description brief="ros_faster_rcnn">
+
+     ros_faster_rcnn
+
+  </description>
+  <author>chenkai</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ros_faster_rcnn</url>
+
+</package>
+
+
