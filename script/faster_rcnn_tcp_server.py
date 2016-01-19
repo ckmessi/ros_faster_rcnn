@@ -6,7 +6,9 @@
 # --------------------------------------------------------
 
 import sys;
-sys.path.append("/home/chenkai/data/frcn/py-faster-rcnn/tools/")
+#sys.path.append("/home/chenkai/data/frcn/py-faster-rcnn/tools/")
+sys.path.append("../py-faster-rcnn/tools/")
+
 import _init_paths
 from fast_rcnn.config import cfg
 from fast_rcnn.test import im_detect
