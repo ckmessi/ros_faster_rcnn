@@ -26,7 +26,8 @@ string g_window_name;
 cv::Mat g_last_image;
 bool start_detect;
 bool request_lock;
-string temp_dir = "/home/chenkai/rosbuild_ws/package_dir/leo_detection/temp/";
+// modify this path
+string temp_dir = "/home/chenkai/rosbuild_ws/package_dir/ros_faster_rcnn/temp/";
 ros::ServiceClient client;
 vector<ObjectInfo> objectList;
 
