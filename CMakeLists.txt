@@ -40,7 +40,7 @@ rosbuild_gensrv()
 #target_link_libraries(${PROJECT_NAME} another_library)
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
-rosbuild_add_executable(ros_faster_rcnn src/ros_faster_rcnn.cpp)
+rosbuild_add_executable(ros_faster_rcnn src/ros_faster_rcnn.cpp src/ObjectInfo.cpp)
 target_link_libraries(ros_faster_rcnn ${catkin_LIBRARIES}
 				    ${GTK_LIBRARIES}
                                     ${GTK2_LIBRARIES}

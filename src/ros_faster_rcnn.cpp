@@ -1,5 +1,5 @@
 #include<iostream>
-
+#include<vector>
 #include <ros/ros.h>
 
 #include <image_transport/image_transport.h>
@@ -15,6 +15,8 @@
 
 #include "ros_faster_rcnn/FasterRcnnDetection.h"
 
+#include "ObjectInfo.h"
+
 using namespace cv;
 using namespace std;
 
@@ -26,13 +28,14 @@ bool start_detect;
 bool request_lock;
 string temp_dir = "/home/chenkai/rosbuild_ws/package_dir/leo_detection/temp/";
 ros::ServiceClient client;
+vector<ObjectInfo> objectList;
 
 // function claim
 void initWindow();
 static void mouseCb(int event, int x, int y, int flags, void* param);
 void imageCb(const sensor_msgs::ImageConstPtr& msg);
 void detect();
-void drawBoundingBox();
+cv::Mat drawBoundingBox(cv::Mat image);
 void* sendFasterRcnnRequest(void *args);
 
 
@@ -74,7 +77,7 @@ int main(int argc, char **argv)
 
     // final process
     cv::destroyWindow(g_window_name);
-    return 0;  	
+    return 0;   
 }
 
 
@@ -126,6 +129,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 
     if (!g_last_image.empty()) {
         // draw bounding box
+        g_last_image = drawBoundingBox(g_last_image);
         const cv::Mat &image = g_last_image;
         cv::imshow(g_window_name, image);
     }
@@ -141,16 +145,14 @@ void detect()
     }
 }
 
-void drawBoundingBox()
+cv::Mat drawBoundingBox(cv::Mat image)
 {
     // draw the box
-    // cout << "detection num:" << d_list.size() << endl;
-    /*
-    for(unsigned int i = 0; i < d_list.size(); i++){
-        cv::rectangle(g_last_image, cvPoint(d_list[i].x1, d_list[i].y1), cvPoint(d_list[i].x2, d_list[i].y2), Scalar(0,255,0),1,1,0);
-        cv::putText(g_last_image, d_list[i].category, cvPoint(d_list[i].x1,d_list[i].y1), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0,255,0), 1, CV_AA);
+    for(unsigned int i = 0; i < objectList.size(); i++){
+        cv::rectangle(image, cvPoint(objectList[i].x1, objectList[i].y1), cvPoint(objectList[i].x2, objectList[i].y2), Scalar(0,255,0),1,1,0);
+        cv::putText(image, objectList[i].category, cvPoint(objectList[i].x1,objectList[i].y1), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0,255,0), 1, CV_AA);
     }   
-    */  
+    return image;
 }
 
 void* sendFasterRcnnRequest(void *args){
@@ -167,15 +169,15 @@ void* sendFasterRcnnRequest(void *args){
         request_lock = true;
         if(client.call(srv))
         {
-            //draw the box
-            string responseStr = srv.response.debug_info;
-            cout << "responseStr:" << responseStr << endl;
+            string debug_info = srv.response.debug_info;
+            cout << "debug_info:" << debug_info << endl;
             string detection_info = srv.response.detection_info;
             cout << "detection_info:" << detection_info <<endl;
-            // drawBoundingBox(detection_info);
+            objectList.clear();
+            objectList = parseObjectInfoList(detection_info, ',');
         }
         else{
-            ROS_ERROR("Failed to call service rcnn_detection");
+            ROS_ERROR("Failed to call service faster_rcnn_detection");
         }
         request_lock = false;
     }
