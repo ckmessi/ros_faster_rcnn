@@ -29,11 +29,14 @@ global client
 def handle_rcnn_demo(req):
     debug_info = "Returning Detection Results for %s" % (req.path)
     print debug_info
-    #client.send(req.path)
-    #data = client.recv(512)
-    #if len(data) > 0:
-    #    result = data
-    result = '100,100,300,300,person'
+
+    # send to tcp server
+    client.send(req.path)
+    data = client.recv(512)
+    if len(data) > 0:
+        result = data
+    
+    # result = '100,100,300,300,person'
     return FasterRcnnDetectionResponse(debug_info, result)
 
 def run_faster_rcnn_detection_service():
@@ -44,11 +47,15 @@ def run_faster_rcnn_detection_service():
 
 if __name__ == '__main__':
    
-    ''' 
+     
     host = "127.0.0.1"
     port = 9999
     addr = (host, port)
 
+    # copy the file
+
+
+    # setup the tcp connection
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
         try:
@@ -59,8 +66,8 @@ if __name__ == '__main__':
             time.sleep(0.1)
             print "connect failed.."
             continue
-    '''
+    
     run_faster_rcnn_detection_service()
 
-    # client.close()
+    client.close()
 
