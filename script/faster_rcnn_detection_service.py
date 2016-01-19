@@ -23,20 +23,30 @@ import traceback
 import socket
 import thread
 
+import os
 
 global client
+server_temp_path = "/home/chenkai/tmp/0000.jpg"
+host = "127.0.0.1"
+port = 9999
+user_name = "chenkai"
 
 def handle_rcnn_demo(req):
     debug_info = "Returning Detection Results for %s" % (req.path)
     print debug_info
 
-    # send to tcp server
+    # method 1, copy file and send message    
+    #scp_transfer_file(req.path, server_temp_path, host, user_name)
+    #client.send(server_temp_path)
+    
+    # method 2, just send message
     client.send(req.path)
     data = client.recv(512)
     if len(data) > 0:
         result = data
     
     # result = '100,100,300,300,person'
+    print "tcp server response:" + result 
     return FasterRcnnDetectionResponse(debug_info, result)
 
 def run_faster_rcnn_detection_service():
@@ -45,11 +55,19 @@ def run_faster_rcnn_detection_service():
     print "ready to object detection"
     rospy.spin()
 
+def scp_transfer_file(local_path, target_path, host, user_name):
+    command = "scp -p "
+    command += local_path
+    command += " "
+    target_path = server_temp_path
+    command += user_name + "@" + host + ":" + target_path
+    
+    os.system(command)
+    
+
+
 if __name__ == '__main__':
    
-     
-    host = "127.0.0.1"
-    port = 9999
     addr = (host, port)
 
     # copy the file

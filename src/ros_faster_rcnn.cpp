@@ -96,6 +96,7 @@ void initWindow()
 static void mouseCb(int event, int x, int y, int flags, void* param){
     if (event == cv::EVENT_LBUTTONDOWN) {
         cout << "left button click: detect once." << endl;
+        request_lock = false;
         detect();
     } 
     else if (event == cv::EVENT_RBUTTONDOWN) {
@@ -167,6 +168,7 @@ void* sendFasterRcnnRequest(void *args){
         ros_faster_rcnn::FasterRcnnDetection srv;
         srv.request.path = filepath;
         request_lock = true;
+        cout << "lock switch to true: request_lock=" << request_lock << endl;
         if(client.call(srv))
         {
             string debug_info = srv.response.debug_info;
@@ -180,6 +182,8 @@ void* sendFasterRcnnRequest(void *args){
             ROS_ERROR("Failed to call service faster_rcnn_detection");
         }
         request_lock = false;
+        cout << "lock switch to false: request_lock=" << request_lock << endl;
+
     }
     else {
         boost::filesystem::path full_path = boost::filesystem::complete(filepath);

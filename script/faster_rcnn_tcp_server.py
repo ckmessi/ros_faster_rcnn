@@ -28,8 +28,6 @@ import thread
 
 
 
-
-# global net
 CLASSES = ('__background__',
            'aeroplane', 'bicycle', 'bird', 'boat',
            'bottle', 'bus', 'car', 'cat', 'chair',
