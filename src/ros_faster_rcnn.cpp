@@ -110,38 +110,43 @@ void initWindow()
 
 // mouse event handle function
 static void mouseCb(int event, int x, int y, int flags, void* param){
-	
-	
 
+	if(mode == MODE_DETECT){
+		if (event == cv::EVENT_LBUTTONDOWN) {
+		    cout << "left button click: detect once." << endl;
+		    request_lock = false;
+		    detect();			
+ 		} 
+    	else if (event == cv::EVENT_RBUTTONDOWN) {
+		    cout << "right button click: touch the detect switch." << endl;
+		    // boost::mutex::scoped_lock lock(g_image_mutex);
+		    start_detect = !start_detect;
+		    cout << start_detect << endl;
+    	}
+		else{
+		    return;
+		}
+	}	
+	else if (mode == MODE_TRACK){
+		if (event == cv::EVENT_LBUTTONDOWN) {
+		    cout << "left button click: detect once." << endl;
+		    request_lock = false;
+		    detect();			
+ 		} 
+    	else if (event == cv::EVENT_RBUTTONDOWN) {
+			cout << "right button click: update tracker switch" << endl;
+			start_track = !start_track;
+    	}
+		else{
+		    return;
+		}
+	}
+	else{
+		cout << "no mode specified, return" << endl;
+		return;
+	}
 
-    if (event == cv::EVENT_LBUTTONDOWN) {
-	
-	    //detect
-        cout << "left button click: detect once." << endl;
-        request_lock = false;
-        detect();
-			
-    } 
-    else if (event == cv::EVENT_RBUTTONDOWN) {
-	/*
-        cout << "right button click: touch the detect switch." << endl;
-        // boost::mutex::scoped_lock lock(g_image_mutex);
-        start_detect = !start_detect;
-        cout << start_detect << endl;
-	*/
-		
-		cout << "right button click: update tracker switch" << endl;
-		// track("update");
-		start_track = !start_track;
-
-	/*
-		cout << "right button click: update tracker." << endl;
-		track("update");
-	*/
-    }
-    else{
-        return;
-    }
+    
 }
 
 void imageCb(const sensor_msgs::ImageConstPtr& msg)
