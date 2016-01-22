@@ -48,4 +48,19 @@ target_link_libraries(ros_faster_rcnn ${catkin_LIBRARIES}
                                     ${Boost_LIBRARIES}
 )
 
+if(NOT WIN32)
+ADD_DEFINITIONS("-std=c++0x -O3")
+endif(NOT WIN32)
+rosbuild_add_executable( KCF src/runtracker.cpp src/kcftracker.cpp src/fhog.cpp )
+target_link_libraries( KCF  ${catkin_LIBRARIES}
+				${OpenCV_LIBS})
+
+rosbuild_add_executable(KCFClient src/kcf_client.cpp)
+target_link_libraries(KCFClient ${catkin_LIBRARIES}
+				    ${GTK_LIBRARIES}
+                                    ${GTK2_LIBRARIES}
+                                    ${OpenCV_LIBRARIES}
+                                    ${Boost_LIBRARIES}
+)
+
 #target_link_libraries(example ${PROJECT_NAME})

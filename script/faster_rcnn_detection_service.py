@@ -27,7 +27,7 @@ import os
 
 global client
 server_temp_path = "/home/chenkai/tmp/0000.jpg"
-host = "127.0.0.1"
+host = "166.111.82.128"
 port = 9999
 user_name = "chenkai"
 

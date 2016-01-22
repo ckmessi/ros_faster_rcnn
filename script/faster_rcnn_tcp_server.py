@@ -144,7 +144,8 @@ def serverLoop(server, info):
 
 if __name__ == '__main__':
     
-    host = "127.0.0.1"
+    #host = "127.0.0.1"
+    host = "166.111.82.128"
     port = 9999
     addr = (host, port)
 

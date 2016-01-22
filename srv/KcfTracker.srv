@@ -1,0 +1,6 @@
+string command
+string path
+string rectangle
+---
+string debug_info
+string detection_info

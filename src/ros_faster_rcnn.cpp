@@ -14,8 +14,12 @@
 
 
 #include "ros_faster_rcnn/FasterRcnnDetection.h"
+#include "ros_faster_rcnn/KcfTracker.h"
 
 #include "ObjectInfo.h"
+
+
+#define MODE_TRACK 2
 
 using namespace cv;
 using namespace std;
@@ -31,6 +35,14 @@ string temp_dir = "/home/chenkai/rosbuild_ws/package_dir/ros_faster_rcnn/temp/";
 ros::ServiceClient client;
 vector<ObjectInfo> objectList;
 
+ros::ServiceClient track_client;
+string track_command = "";
+bool start_track = false;
+
+
+int mode = 2;	// 1.detect; 2.track;
+
+
 // function claim
 void initWindow();
 static void mouseCb(int event, int x, int y, int flags, void* param);
@@ -38,6 +50,10 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg);
 void detect();
 cv::Mat drawBoundingBox(cv::Mat image);
 void* sendFasterRcnnRequest(void *args);
+
+void track(string command);
+void* sendKcfTrackerRequest(void *args);
+string convertToRectStr(int x, int y, int width, int height);
 
 
 int main(int argc, char **argv)
@@ -70,8 +86,7 @@ int main(int argc, char **argv)
     // initial the service client
     ros::NodeHandle n;
     client = n.serviceClient<ros_faster_rcnn::FasterRcnnDetection>("faster_rcnn_detection");
-
-
+    track_client = n.serviceClient<ros_faster_rcnn::KcfTracker>("kcf_tracker");
 
     // wait
     ros::spin();
@@ -95,16 +110,34 @@ void initWindow()
 
 // mouse event handle function
 static void mouseCb(int event, int x, int y, int flags, void* param){
+	
+	
+
+
     if (event == cv::EVENT_LBUTTONDOWN) {
+	
+	    //detect
         cout << "left button click: detect once." << endl;
         request_lock = false;
         detect();
+			
     } 
     else if (event == cv::EVENT_RBUTTONDOWN) {
+	/*
         cout << "right button click: touch the detect switch." << endl;
         // boost::mutex::scoped_lock lock(g_image_mutex);
         start_detect = !start_detect;
         cout << start_detect << endl;
+	*/
+		
+		cout << "right button click: update tracker switch" << endl;
+		// track("update");
+		start_track = !start_track;
+
+	/*
+		cout << "right button click: update tracker." << endl;
+		track("update");
+	*/
     }
     else{
         return;
@@ -127,6 +160,10 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
     if(start_detect == true && request_lock == false){
         detect();
     }
+	// track the object
+	if(start_track == true && request_lock == false){
+		track("update");
+	}
     
 
     if (!g_last_image.empty()) {
@@ -178,6 +215,10 @@ void* sendFasterRcnnRequest(void *args){
             cout << "detection_info:" << detection_info <<endl;
             objectList.clear();
             objectList = parseObjectInfoList(detection_info, ',');
+
+			// if success, init tracker
+			cout << "initial tracker." << endl;
+			track("initial");
         }
         else{
             ROS_ERROR("Failed to call service faster_rcnn_detection");
@@ -194,3 +235,98 @@ void* sendFasterRcnnRequest(void *args){
     void *ret;
     return ret;
 }
+
+void track(string command){
+	if(command == "initial"){
+		track_command = "initial";
+	}
+	else if (command == "update"){
+		track_command = "update";
+	}
+	else{
+		return;
+	}
+    pthread_t tid;
+    int ret = pthread_create( &tid, NULL, sendKcfTrackerRequest, NULL);  
+    if( ret != 0 )
+    {  
+        cout << "pthread_create error:error_code=" << ret << endl;  
+    }
+}
+
+void* sendKcfTrackerRequest(void *args){
+    const cv::Mat &image = g_last_image;
+    if (image.empty()) {
+        ROS_WARN("Couldn't save image, no data!");
+    }
+    std::string filename = "0000.jpg";
+    string filepath = temp_dir + filename;    
+    if (cv::imwrite(filepath, image)) {
+        ROS_INFO("Saved image %s", filepath.c_str());
+        ros_faster_rcnn::KcfTracker srv;
+		srv.request.command = track_command;
+        srv.request.path = filepath;
+
+		srv.request.rectangle = "0,0,1,1";
+		if(objectList.size() > 0){
+			srv.request.rectangle = convertToRectStr(objectList[0].x1, objectList[0].y1,objectList[0].x2-objectList[0].x1, objectList[0].y2-objectList[0].y1);
+		}
+        request_lock = true;
+        cout << "lock switch to true: request_lock=" << request_lock << endl;
+        if(track_client.call(srv))
+        {
+			
+            string debug_info = srv.response.debug_info;
+            cout << "debug_info:" << debug_info << endl;
+            string detection_info = srv.response.detection_info;
+            cout << "detection_info:" << detection_info <<endl;
+            // objectList.clear();
+            // objectList = parseObjectInfoList(detection_info, ',');
+			detection_info += ",person";
+			objectList.clear();
+            objectList = parseObjectInfoList(detection_info, ',');
+			
+        }
+        else{
+            ROS_ERROR("Failed to call service kcf_tracker");
+        }
+        request_lock = false;
+        cout << "lock switch to false: request_lock=" << request_lock << endl;
+
+    }
+    else {
+        boost::filesystem::path full_path = boost::filesystem::complete(filepath);
+        ROS_ERROR_STREAM("Failed to save image. Have permission to write there?: " << full_path);
+    }
+    void *ret;
+    return ret;
+}
+
+
+string convertToRectStr(int x, int y, int width, int height){
+	
+	string result = "";
+
+	string temp = "";
+	stringstream ss;
+	ss.clear();
+	ss << x;
+	ss >> temp;
+	result += temp + ",";
+	ss.clear();
+	ss << y;
+	ss >> temp;
+	result += temp + ",";
+	ss.clear();
+	ss << width;
+	ss >> temp;
+	result += temp + ",";
+	ss.clear();
+	ss << height;
+	ss >> temp;
+	result += temp;
+
+	return result;
+}
+
+
