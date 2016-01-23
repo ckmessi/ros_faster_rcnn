@@ -46,7 +46,8 @@ bool track_request_lock;
 
 
 int mode = MODE_TRACK;//MODE_TRACK;	// 1.detect; 2.track;
-int data_source = DATA_VIDEO;
+int data_source = DATA_CAMERA;
+string video_path = "";
 
 // function claim
 void initWindow();
@@ -66,6 +67,38 @@ int main(int argc, char **argv)
 
     cout << "Hello, world!" << endl;
 
+	// parse the parameter
+	for(int i = 0; i < argc; i++){
+		if(strcmp(argv[i], "-m") == 0){
+			if(i + 1 < argc){
+				mode = atoi(argv[i+1]);
+			}
+			else{
+				cout << "parameter error" << endl;
+				return 0;
+			}
+		}
+		if(strcmp(argv[i], "-d") == 0){
+			if(i + 1 < argc){
+				data_source = atoi(argv[i+1]);
+			}
+			else{
+				cout << "parameter error" << endl;
+				return 0;
+			}
+		}
+		if(strcmp(argv[i], "-path") == 0){
+			if(i + 1 < argc){
+				video_path = argv[i+1];
+			}
+			else{
+				cout << "parameter error" << endl;
+				return 0;
+			}
+		}
+	}
+	
+	
 	// init window
 	g_window_name = "windows for ros_faster_rcnn";
 	initWindow();
@@ -76,7 +109,8 @@ int main(int argc, char **argv)
 
 	// ros initial
 	ros::init(argc, argv, "ros_faster_rcnn", ros::init_options::AnonymousName);
-		
+	
+
 	// initial the service client
 	ros::NodeHandle n;
 	client = n.serviceClient<ros_faster_rcnn::FasterRcnnDetection>("faster_rcnn_detection");
@@ -87,7 +121,7 @@ int main(int argc, char **argv)
 	if(data_source == DATA_VIDEO){ 
 		// video
 		
-		CvCapture* capture = cvCreateFileCapture("3.mkv");  
+		CvCapture* capture = cvCreateFileCapture(video_path.c_str());  
 		IplImage* frame;  
 		while(1)  
 		{  
@@ -143,8 +177,7 @@ int main(int argc, char **argv)
 
 	// final process
 	cv::destroyWindow(g_window_name);
-
-
+	
     return 0;   
 }
 
