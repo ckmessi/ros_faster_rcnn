@@ -18,8 +18,12 @@
 
 #include "ObjectInfo.h"
 
-
+#define MODE_DETECT 1
 #define MODE_TRACK 2
+#define MODE_TEST 99
+#define DATA_CAMERA 1
+#define DATA_VIDEO 2
+
 
 using namespace cv;
 using namespace std;
@@ -38,10 +42,11 @@ vector<ObjectInfo> objectList;
 ros::ServiceClient track_client;
 string track_command = "";
 bool start_track = false;
+bool track_request_lock;
 
 
-int mode = 2;	// 1.detect; 2.track;
-
+int mode = MODE_TRACK;//MODE_TRACK;	// 1.detect; 2.track;
+int data_source = DATA_VIDEO;
 
 // function claim
 void initWindow();
@@ -60,39 +65,86 @@ int main(int argc, char **argv)
 {
 
     cout << "Hello, world!" << endl;
-    ros::init(argc, argv, "ros_faster_rcnn", ros::init_options::AnonymousName);
-    if (ros::names::remap("image") == "image") {
-        ROS_WARN("Topic 'image' has not been remapped!");
-    }
 
-    // init window
-    g_window_name = "windows for ros_faster_rcnn";
-    initWindow();
-    start_detect = false;
-    request_lock = false;
+	// init window
+	g_window_name = "windows for ros_faster_rcnn";
+	initWindow();
+	start_detect = false;
+	request_lock = false;
+	start_track = false;
+	track_request_lock = false;
 
-    // init image transport
-    ros::NodeHandle nh;
-    std::string topic = nh.resolveName("image");
-    ros::NodeHandle local_nh("~");
-    std::string transport;
-    local_nh.param("image_transport", transport, std::string("raw"));
-    ROS_INFO_STREAM("Using transport \"" << transport << "\"");
-    image_transport::ImageTransport it(local_nh);
-    image_transport::TransportHints hints(transport, ros::TransportHints(), local_nh);
-    image_transport::Subscriber sub = it.subscribe(topic, 1, imageCb, hints);
+	// ros initial
+	ros::init(argc, argv, "ros_faster_rcnn", ros::init_options::AnonymousName);
+		
+	// initial the service client
+	ros::NodeHandle n;
+	client = n.serviceClient<ros_faster_rcnn::FasterRcnnDetection>("faster_rcnn_detection");
+	track_client = n.serviceClient<ros_faster_rcnn::KcfTracker>("kcf_tracker");
+
+	
+	
+	if(data_source == DATA_VIDEO){ 
+		// video
+		
+		CvCapture* capture = cvCreateFileCapture("3.mkv");  
+		IplImage* frame;  
+		while(1)  
+		{  
+			frame = cvQueryFrame(capture);  
+			if(!frame) 
+				break;
+			g_last_image = cv::Mat(frame);
+			const cv::Mat &image = g_last_image;
+			if(start_detect == true && request_lock == false){
+        		detect();
+    		}
+			// track the object
+			if(start_track == true && track_request_lock == false){
+				track("update");
+			}    
+
+   		 	if (!g_last_image.empty()) {
+		        // draw bounding box
+        		g_last_image = drawBoundingBox(g_last_image);
+        		const cv::Mat &image = g_last_image;
+        		cv::imshow(g_window_name, image);
+    		}
+			char c = cvWaitKey(33);  
+			if(c == 27)  
+				break;  
+		}  
+		cvReleaseCapture(&capture); 
+	}
+	else if (data_source == DATA_CAMERA) {
+		// camera
+		
+		if (ros::names::remap("image") == "image") {
+		    ROS_WARN("Topic 'image' has not been remapped!");
+		}
+
+		// init image transport
+		ros::NodeHandle nh;
+		std::string topic = nh.resolveName("image");
+		ros::NodeHandle local_nh("~");
+		std::string transport;
+		local_nh.param("image_transport", transport, std::string("raw"));
+		ROS_INFO_STREAM("Using transport \"" << transport << "\"");
+		image_transport::ImageTransport it(local_nh);
+		image_transport::TransportHints hints(transport, ros::TransportHints(), local_nh);
+		image_transport::Subscriber sub = it.subscribe(topic, 1, imageCb, hints);
+	
+		// wait
+		ros::spin();
+	}
+	else {
+		cout << "no data source specified..." << endl;
+	}
+
+	// final process
+	cv::destroyWindow(g_window_name);
 
 
-    // initial the service client
-    ros::NodeHandle n;
-    client = n.serviceClient<ros_faster_rcnn::FasterRcnnDetection>("faster_rcnn_detection");
-    track_client = n.serviceClient<ros_faster_rcnn::KcfTracker>("kcf_tracker");
-
-    // wait
-    ros::spin();
-
-    // final process
-    cv::destroyWindow(g_window_name);
     return 0;   
 }
 
@@ -131,18 +183,53 @@ static void mouseCb(int event, int x, int y, int flags, void* param){
 		if (event == cv::EVENT_LBUTTONDOWN) {
 		    cout << "left button click: detect once." << endl;
 		    request_lock = false;
+			start_track = false;
 		    detect();			
  		} 
-    	else if (event == cv::EVENT_RBUTTONDOWN) {
+    	else if (event == cv::EVENT_RBUTTONDOWN) {			
 			cout << "right button click: update tracker switch" << endl;
-			start_track = !start_track;
+			if(objectList.size() > 0){
+				int target = 0;
+				for(int i = 0; i < objectList.size(); i++){
+					if((x >= objectList[i].x1) && (x <= objectList[i].x2) & (y >= objectList[i].y1) && (y <= objectList[i].y2)){
+						target = i;
+						break;
+					}
+				}
+				ObjectInfo targetOb = objectList[target];
+				objectList.clear();
+				objectList.push_back(targetOb);
+				track("initial");
+				start_track = !start_track;
+			}
+			else{
+				cout << "no object exists!" << endl;
+			}
+			
+
     	}
 		else{
 		    return;
 		}
 	}
+	else if (mode == MODE_TEST){
+		if (event == cv::EVENT_LBUTTONDOWN) {
+		    cout << "left button click: detect once." << endl;
+		    request_lock = false;
+		    detect();	
+ 		}
+		else if (event == cv::EVENT_RBUTTONDOWN){
+			if(objectList.size() > 0){
+				if((x >= objectList[0].x1) && (x <= objectList[0].x2) & (y >= objectList[0].y1) && (y <= objectList[0].y2)){				
+					cout << "hit the object!" << endl;	
+				}
+				else{
+					cout << "no hit" << endl;
+				}
+			}
+		}		
+	}
 	else{
-		cout << "no mode specified, return" << endl;
 		return;
 	}
 
@@ -151,10 +238,9 @@ static void mouseCb(int event, int x, int y, int flags, void* param){
 
 void imageCb(const sensor_msgs::ImageConstPtr& msg)
 {
-
     // boost::mutex::scoped_lock lock(g_image_mutex);
     // Convert to OpenCV native BGR color
-    try {
+	try {
         g_last_image = cv_bridge::toCvCopy(msg, "bgr8")->image;
     }
     catch (cv_bridge::Exception& e) {
@@ -166,10 +252,9 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
         detect();
     }
 	// track the object
-	if(start_track == true && request_lock == false){
+	if(start_track == true && track_request_lock == false){
 		track("update");
-	}
-    
+	}    
 
     if (!g_last_image.empty()) {
         // draw bounding box
@@ -221,9 +306,6 @@ void* sendFasterRcnnRequest(void *args){
             objectList.clear();
             objectList = parseObjectInfoList(detection_info, ',');
 
-			// if success, init tracker
-			cout << "initial tracker." << endl;
-			track("initial");
         }
         else{
             ROS_ERROR("Failed to call service faster_rcnn_detection");
@@ -260,6 +342,7 @@ void track(string command){
 }
 
 void* sendKcfTrackerRequest(void *args){
+
     const cv::Mat &image = g_last_image;
     if (image.empty()) {
         ROS_WARN("Couldn't save image, no data!");
@@ -271,13 +354,12 @@ void* sendKcfTrackerRequest(void *args){
         ros_faster_rcnn::KcfTracker srv;
 		srv.request.command = track_command;
         srv.request.path = filepath;
-
 		srv.request.rectangle = "0,0,1,1";
 		if(objectList.size() > 0){
 			srv.request.rectangle = convertToRectStr(objectList[0].x1, objectList[0].y1,objectList[0].x2-objectList[0].x1, objectList[0].y2-objectList[0].y1);
 		}
-        request_lock = true;
-        cout << "lock switch to true: request_lock=" << request_lock << endl;
+        track_request_lock = true;
+        cout << "lock switch to true: track_request_lock=" << track_request_lock << endl;
         if(track_client.call(srv))
         {
 			
@@ -295,8 +377,8 @@ void* sendKcfTrackerRequest(void *args){
         else{
             ROS_ERROR("Failed to call service kcf_tracker");
         }
-        request_lock = false;
-        cout << "lock switch to false: request_lock=" << request_lock << endl;
+        track_request_lock = false;
+        cout << "lock switch to false: track_request_lock=" << track_request_lock << endl;
 
     }
     else {
